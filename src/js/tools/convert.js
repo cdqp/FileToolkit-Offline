@@ -5,7 +5,7 @@ import { escapeHtml } from "../core/dom.js";
 import { baseName, makeFile, MIME, stemName, textFile } from "../core/files.js";
 import { isBrowserImage } from "../core/formats.js";
 import { ARCHIVE_LABELS, readArchive, writeArchive } from "../lib/archive.js";
-import { audioToWav, decodeAudio } from "../lib/audio.js";
+import { audioToWav, decodeAudio, MAX_DECODE_SIZE } from "../lib/audio.js";
 import {
   detectDelimiter,
   objectsToRows,
@@ -131,6 +131,11 @@ export async function conversionTargets(file, info) {
     return result([...(await rasterTargets()), "pdf", "ico", "bmp", ...wrap]);
   }
   if (g === "audio" || g === "video") {
+    if (file.size > MAX_DECODE_SIZE) {
+      return result(wrap, {
+        warning: `Fichier trop volumineux (plus de ${MAX_DECODE_SIZE / 1024 / 1024} Mo) pour être décodé dans le navigateur : seul l'archivage est proposé.`,
+      });
+    }
     try {
       cache.audio = await decodeAudio(file);
     } catch (e) {

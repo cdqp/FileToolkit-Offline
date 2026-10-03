@@ -73,8 +73,15 @@ test("TAR : écriture PAX (noms longs et accentués) relue à l'identique", asyn
   if (hasCommand("tar")) {
     const dir = mkdtempSync(path.join(tmpdir(), "cdqp-"));
     writeFileSync(path.join(dir, "t.tar"), tar);
-    const listing = execFileSync("tar", ["-tf", path.join(dir, "t.tar")], { encoding: "utf8" });
-    assert.match(listing, /^dossier\/.{150,}long-nom-\.txt$/m);
+    // Selon la locale, tar affiche les octets UTF-8 tels quels ou échappés en octal (\303\250) :
+    // la sortie est donc lue en octets, les échappements remplacés, puis le tout décodé en UTF-8.
+    const raw = execFileSync("tar", ["-tf", path.join(dir, "t.tar")]).toString("latin1");
+    const listing = Buffer.from(
+      raw.replace(/\\(\d{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8))),
+      "latin1",
+    ).toString("utf8");
+    const decoded = listing.split("\n");
+    assert.ok(decoded.includes(cleanEntryName(entries[1].name)), listing);
   }
 });
 

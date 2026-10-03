@@ -275,7 +275,7 @@ export function initSplit(root) {
     setStatus(root, "Identification du mode de découpe adapté…", "", true);
     try {
       item.info = await identify(file);
-      mode = splitMode(item.info);
+      mode = splitMode(item.info, file.size);
       let detail = MODE_TITLES[mode];
       if (mode === "pdf") detail = `${pluralize(await pdfPageCount(file), "page")}`;
       if (mode === "audio") {

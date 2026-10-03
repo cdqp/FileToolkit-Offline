@@ -2,15 +2,15 @@
 
 import { baseName, extOf, makeFile, MIME, textFile } from "../core/files.js";
 import { isBrowserImage } from "../core/formats.js";
-import { decodeAudio } from "../lib/audio.js";
+import { decodeAudio, MAX_DECODE_SIZE } from "../lib/audio.js";
 import { detectDelimiter, parseCSV, toCSV } from "../lib/csv.js";
 import { canEncode, createCanvas, encodeCanvas, IMAGE_MIME, loadImage, releaseCanvas } from "../lib/image.js";
 import { loadPdfLib, pdfSubsets } from "../lib/pdf-create.js";
 import { encodeWav } from "../lib/wav.js";
 
-export function splitMode(info) {
+export function splitMode(info, size = 0) {
   if (info.format === "pdf") return "pdf";
-  if (info.group === "audio") return "audio";
+  if (info.group === "audio" && size <= MAX_DECODE_SIZE) return "audio";
   if (info.format === "csv" || info.format === "tsv") return "csv";
   if (info.format === "json") return "json";
   if (info.group === "image" && isBrowserImage(info.format) && info.format !== "svg") return "image";
@@ -220,7 +220,7 @@ async function splitBinary(file, opts, onProgress) {
  * @returns {Promise<{files: File[], note: string, volumes?: boolean}>}
  */
 export async function splitFile(file, info, opts = {}, onProgress = () => {}) {
-  const mode = splitMode(info);
+  const mode = splitMode(info, file.size);
   if (mode === "pdf") return splitPdf(file, opts, onProgress);
   if (mode === "audio") return splitAudio(file, opts, onProgress);
   if (mode === "image") return splitImage(file, info, opts, onProgress);

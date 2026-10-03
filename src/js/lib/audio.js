@@ -1,6 +1,9 @@
 import { encodeWav, nativeSampleRate } from "./wav.js";
 
 const OfflineContext = () => globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+/** Au-delà, décoder tout le fichier en mémoire risquerait de saturer l'onglet. */
+export const MAX_DECODE_SIZE = 512 * 1024 * 1024;
+
 const clampRate = (rate) => Math.min(192000, Math.max(8000, Math.round(rate)));
 
 /** Décode un fichier audio à sa fréquence d'origine (évite un rééchantillonnage implicite). */

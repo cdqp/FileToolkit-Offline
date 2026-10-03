@@ -4,7 +4,7 @@
 import { ascii, toBytes } from "../core/bytes.js";
 import { baseName, extOf, makeFile, MIME, normalizedExt } from "../core/files.js";
 import { isBrowserImage } from "../core/formats.js";
-import { audioToWav, decodeAudio } from "../lib/audio.js";
+import { audioToWav, decodeAudio, MAX_DECODE_SIZE } from "../lib/audio.js";
 import {
   canEncode,
   drawToCanvas,
@@ -69,7 +69,7 @@ export async function optimizationPlan(file, info) {
   }
   if (OFFICE.includes(f)) return { kind: "office", cache: {}, label: "images internes et conteneur" };
   if (["zip", "jar", "cbz"].includes(f)) return { kind: "zip", cache: {}, label: "recompression ZIP" };
-  if (info.group === "audio") {
+  if (info.group === "audio" && file.size <= MAX_DECODE_SIZE) {
     const audio = await decodeAudio(file);
     const warning = COMPRESSED_AUDIO.includes(f)
       ? "Ce fichier est déjà compressé : sa version WAV serait plus lourde. Sans encodeur MP3/AAC hors ligne, l'original sera très probablement conservé."

@@ -2,7 +2,7 @@
 <html lang="fr" data-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-M9uK+sT8Q+gFrWSMdOidEujdmyRR4rUP0tRTmLdkBMo=' 'sha256-0U5xqV7zKQ3sZqnP3Yo3wt1iT28rWUxFEvYH1KVuGfw=' 'sha256-J4Yn86Xj76led6tWXxCDHTzbnLthfvg4jW/0v5YtSIc=' 'sha256-tjWoVtENdjj+8DZiw70SKQTbrVMI9NMrn/3CScU+fnk=' blob:; worker-src blob:; child-src blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src data: blob:; form-action 'none'; base-uri 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-M9uK+sT8Q+gFrWSMdOidEujdmyRR4rUP0tRTmLdkBMo=' 'sha256-0U5xqV7zKQ3sZqnP3Yo3wt1iT28rWUxFEvYH1KVuGfw=' 'sha256-J4Yn86Xj76led6tWXxCDHTzbnLthfvg4jW/0v5YtSIc=' 'sha256-oH6ZkSUwTNuSRxTCu0EItc4KDM/u/dAlGCIjbxGq41g=' blob:; worker-src blob:; child-src blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src data: blob:; form-action 'none'; base-uri 'none'">
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#0a0b0f" />
@@ -1772,6 +1772,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   // src/js/lib/audio.js
   var OfflineContext = () => globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+  var MAX_DECODE_SIZE = 512 * 1024 * 1024;
   var clampRate = (rate) => Math.min(192e3, Math.max(8e3, Math.round(rate)));
   async function decodeAudio(file) {
     const Context = OfflineContext();
@@ -3947,6 +3948,11 @@ ${toYaml(v, Array.isArray(v) ? indent : indent + 2)}`;
       return result([...await rasterTargets(), "pdf", "ico", "bmp", ...wrap2]);
     }
     if (g === "audio" || g === "video") {
+      if (file.size > MAX_DECODE_SIZE) {
+        return result(wrap2, {
+          warning: `Fichier trop volumineux (plus de ${MAX_DECODE_SIZE / 1024 / 1024} Mo) pour être décodé dans le navigateur : seul l'archivage est proposé.`
+        });
+      }
       try {
         cache.audio = await decodeAudio(file);
       } catch (e) {
@@ -5394,7 +5400,7 @@ ${rowsToMarkdown(s.rows)}`).join("\n"), name2, "md")];
     }
     if (OFFICE.includes(f)) return { kind: "office", cache: {}, label: "images internes et conteneur" };
     if (["zip", "jar", "cbz"].includes(f)) return { kind: "zip", cache: {}, label: "recompression ZIP" };
-    if (info.group === "audio") {
+    if (info.group === "audio" && file.size <= MAX_DECODE_SIZE) {
       const audio = await decodeAudio(file);
       const warning = COMPRESSED_AUDIO.includes(f) ? "Ce fichier est déjà compressé : sa version WAV serait plus lourde. Sans encodeur MP3/AAC hors ligne, l'original sera très probablement conservé." : void 0;
       return {
@@ -5969,9 +5975,9 @@ ${rowsToMarkdown(s.rows)}`).join("\n"), name2, "md")];
   }
 
   // src/js/tools/split.js
-  function splitMode(info) {
+  function splitMode(info, size = 0) {
     if (info.format === "pdf") return "pdf";
-    if (info.group === "audio") return "audio";
+    if (info.group === "audio" && size <= MAX_DECODE_SIZE) return "audio";
     if (info.format === "csv" || info.format === "tsv") return "csv";
     if (info.format === "json") return "json";
     if (info.group === "image" && isBrowserImage(info.format) && info.format !== "svg") return "image";
@@ -6157,7 +6163,7 @@ Ces ${count} volumes ne sont pas utilisables séparément : recollez-les dans l'
   }
   async function splitFile(file, info, opts = {}, onProgress = () => {
   }) {
-    const mode = splitMode(info);
+    const mode = splitMode(info, file.size);
     if (mode === "pdf") return splitPdf(file, opts, onProgress);
     if (mode === "audio") return splitAudio(file, opts, onProgress);
     if (mode === "image") return splitImage(file, info, opts, onProgress);
@@ -6405,7 +6411,7 @@ Ces ${count} volumes ne sont pas utilisables séparément : recollez-les dans l'
       setStatus(root, "Identification du mode de découpe adapté…", "", true);
       try {
         item.info = await identify(file);
-        mode = splitMode(item.info);
+        mode = splitMode(item.info, file.size);
         let detail = MODE_TITLES[mode];
         if (mode === "pdf") detail = `${pluralize(await pdfPageCount(file), "page")}`;
         if (mode === "audio") {
