@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci
+
+      - name: Formatage
+        run: npm run lint:format
+
+      - name: Fichier HTML à jour avec les sources
+        run: npm run check
+
+      - name: Tests unitaires
+        run: npm test
+
+      - name: Navigateur Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Tests de bout en bout
+        run: npm run test:e2e
+
+      - name: Traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+  release:
+    name: Publication
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Empreinte du fichier
+        run: sha256sum CDQP_Offline_File_Toolkit.html > CDQP_Offline_File_Toolkit.html.sha256
+
+      - name: Création de la version GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          CDQP_Offline_File_Toolkit.html CDQP_Offline_File_Toolkit.html.sha256
+          --title "CDQP Offline File Toolkit $GITHUB_REF_NAME"
+          --notes-file CHANGELOG.md
